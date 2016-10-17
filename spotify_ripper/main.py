@@ -34,11 +34,7 @@ def load_config(defaults):
                 return defaults
             config_items = dict(config.items("main"))
 
-            to_array_options = [
-                "comment", "cover_file", "cover_file_and_embed", "directory",
-                "fail_log", "format", "genres", "grouping", "key", "user",
-                "password", "log", "artist_album_type", "replace", "partial_check",
-                "artist_album_market"]
+            to_array_options = ["replace"]
 
             # coerce boolean and none types
             config_items_new = {}
@@ -55,7 +51,7 @@ def load_config(defaults):
                 else:
                     item = item.strip("'\"")
 
-                # certain options need to be in array (nargs=1)
+                # certain options need to be in array (nargs=+)
                 if u_key in to_array_options:
                     item = [item]
 
@@ -99,6 +95,19 @@ def patch_bug_in_mutagen():
     MP4Tags._MP4Tags__atoms[b"covr"] = (
         MP4Tags._MP4Tags__parse_cover, MP4Tags.__fixed_render_cover)
 
+def partial_check_type(v):
+    valid_choices = {'none', 'weak', 'strict'}
+
+    if v in valid_choices:
+        return v
+
+    # allow user to override the "wiggle-room" for a weak check
+    import re
+    try:
+        return re.match("^weak:[0-9]+$", v).group(0)
+    except:
+        raise argparse.ArgumentTypeError("String '" + v +
+            "' does not match none, weak, weak:<sec>, strict")
 
 def main(prog_args=sys.argv[1:]):
     # in case we changed the location of the settings directory where the
@@ -107,7 +116,7 @@ def main(prog_args=sys.argv[1:]):
     # config file)
     settings_parser = argparse.ArgumentParser(add_help=False)
     settings_parser.add_argument(
-        '-S', '--settings', nargs=1,
+        '-S', '--settings',
         help='Path to settings, config and temp files directory '
              '[Default=~/.spotify-ripper]')
     args, remaining_argv = settings_parser.parse_known_args(prog_args)
@@ -163,14 +172,21 @@ def main(prog_args=sys.argv[1:]):
         '--aac', action='store_true',
         help='Rip songs to AAC format with FreeAAC instead of MP3')
     encoding_group.add_argument(
+        '--aiff', action='store_true',
+        help='Rip songs to lossless AIFF encoding instead of MP3')
+    encoding_group.add_argument(
         '--alac', action='store_true',
         help='Rip songs to Apple Lossless format instead of MP3')
     parser.add_argument(
-        '--artist-album-type', nargs=1,
+        '--all-artists', action='store_true',
+        help='Store all artists, rather than just the main artist, in the '
+             'track\'s metadata tag')
+    parser.add_argument(
+        '--artist-album-type',
         help='Only load albums of specified types when passing a Spotify '
              'artist URI [Default=album,single,ep,compilation,appears_on]')
     parser.add_argument(
-        '--artist-album-market', nargs=1,
+        '--artist-album-market',
         help='Only load albums with the specified ISO2 country code when '
              'passing a Spotify artist URI. You may get duplicate albums '
              'if not set. [Default=any]')
@@ -186,27 +202,27 @@ def main(prog_args=sys.argv[1:]):
         '--comp',
         help='compression complexity for FLAC and Opus [Default=Max]')
     parser.add_argument(
-        '--comment', nargs=1,
+        '--comment',
         help='Set comment metadata tag to all songs. Can include '
              'same tags as --format.')
     parser.add_argument(
-        '--cover-file', nargs=1,
+        '--cover-file',
         help='Save album cover image to file name (e.g "cover.jpg") '
              '[Default=embed]')
     parser.add_argument(
-        '--cover-file-and-embed', nargs=1, metavar="COVER_FILE",
+        '--cover-file-and-embed', metavar="COVER_FILE",
         help='Same as --cover-file but embeds the cover image too')
     parser.add_argument(
-        '-d', '--directory', nargs=1,
+        '-d', '--directory',
         help='Base directory where ripped MP3s are saved [Default=cwd]')
     parser.add_argument(
-        '--fail-log', nargs=1,
+        '--fail-log',
         help="Logs the list of track URIs that failed to rip")
     encoding_group.add_argument(
         '--flac', action='store_true',
         help='Rip songs to lossless FLAC encoding instead of MP3')
     parser.add_argument(
-        '-f', '--format', nargs=1,
+        '-f', '--format',
         help='Save songs using this path and filename structure (see README)')
     parser.add_argument(
         '--format-case', choices=['upper', 'lower', 'capitalize'],
@@ -221,32 +237,36 @@ def main(prog_args=sys.argv[1:]):
         help='Similar to --flat [-f] but includes the playlist index at '
              'the start of the song file')
     parser.add_argument(
-        '-g', '--genres', nargs=1,
+        '-g', '--genres',
         choices=['artist', 'album'],
         help='Attempt to retrieve genre information from Spotify\'s '
              'Web API [Default=skip]')
     parser.add_argument(
-        '--grouping', nargs=1,
+        '--grouping',
         help='Set grouping metadata tag to all songs. Can include '
              'same tags as --format.')
     encoding_group.add_argument(
         '--id3-v23', action='store_true',
         help='Store ID3 tags using version v2.3 [Default=v2.4]')
     parser.add_argument(
-        '-k', '--key', nargs=1,
+        '-k', '--key',
         help='Path to Spotify application key file '
              '[Default=Settings Directory]')
     group.add_argument(
-        '-u', '--user', nargs=1,
+        '-u', '--user',
         help='Spotify username')
     parser.add_argument(
-        '-p', '--password', nargs=1,
+        '-p', '--password',
         help='Spotify password [Default=ask interactively]')
+    parser.add_argument(
+        '--large-cover-art', action='store_true',
+        help='Attempt to retrieve 640x640 cover art from Spotify\'s Web API '
+             '[Default=300x300]')
     group.add_argument(
         '-l', '--last', action='store_true',
         help='Use last login credentials')
     parser.add_argument(
-        '-L', '--log', nargs=1,
+        '-L', '--log',
         help='Log in a log-friendly format to a file (use - to log to stdout)')
     encoding_group.add_argument(
         '--pcm', action='store_true',
@@ -269,10 +289,12 @@ def main(prog_args=sys.argv[1:]):
         '--opus', action='store_true',
         help='Rip songs to Opus encoding instead of MP3')
     parser.add_argument(
-        '--partial-check', choices=['none', 'weak', 'strict'],
+        '--partial-check', metavar="{none,weak,weak:<sec>,strict}", type=partial_check_type,
         help='Check for and overwrite partially ripped files. "weak" will '
              'err on the side of not re-ripping the file if it is unsure, '
-             'whereas "strict" will re-rip the file [Default=weak]')
+             'whereas "strict" will re-rip the file.  You can override the '
+             'number of seconds of wiggle-room for the "weak" check using '
+             '"weak:<sec>" [Default=weak:3]')
     parser.add_argument(
         '--play-token-resume', metavar="RESUME_AFTER",
         help='If the \'play token\' is lost to a different device using '
@@ -281,13 +303,25 @@ def main(prog_args=sys.argv[1:]):
              'values as --resume-after [Default=abort]')
     parser.add_argument(
         '--playlist-m3u', action='store_true',
-        help='create a m3u file when ripping a playlist')
+        help='create a m3u file with relative paths when ripping a playlist')
+    parser.add_argument(
+        '--playlist-absolute-paths', action='store_true', default=False,
+        help='creates the playlist file with absolute paths instead of relative')
+    parser.add_argument(
+        '--playlist-directory',
+        help='creates the playlist file in another directory [Default=Song Directory]')
     parser.add_argument(
         '--playlist-wpl', action='store_true',
         help='create a wpl file when ripping a playlist')
     parser.add_argument(
         '--playlist-sync', action='store_true',
         help='Sync playlist songs (rename and remove old songs)')
+    parser.add_argument(
+        '--plus-pcm', action='store_true',
+        help='Saves a .pcm file in addition to the encoded file (e.g. mp3)')
+    parser.add_argument(
+        '--plus-wav', action='store_true',
+        help='Saves a .wav file in addition to the encoded file (e.g. mp3)')
     parser.add_argument(
         '-q', '--vbr',
         help='VBR quality setting or target bitrate for Opus [Default=0]')
@@ -308,8 +342,7 @@ def main(prog_args=sys.argv[1:]):
         '-R', '--replace', nargs="+", required=False,
         help='pattern to replace the output filename separated by "/". '
              'The following example replaces all spaces with "_" and all "-" '
-             'with ".":'
-             '    spotify-ripper --replace " /_" "\-/." uri')
+             'with ".":    spotify-ripper --replace " /_" "\-/." uri')
     parser.add_argument(
         '-s', '--strip-colors', action='store_true',
         help='Strip coloring from output [Default=colors]')
@@ -322,16 +355,24 @@ def main(prog_args=sys.argv[1:]):
              '(e.g. 1h30m). Alternatively, accepts a specific time in 24hr '
              'format to stop after (e.g 03:30, 16:15)')
     parser.add_argument(
+        '--timeout', type=int,
+        help='Override the PySpotify timeout value in seconds (Default=10 seconds)')
+    parser.add_argument(
         '-V', '--version', action='version', version=prog_version)
     encoding_group.add_argument(
         '--wav', action='store_true',
         help='Rip songs to uncompressed WAV file instead of MP3')
+    parser.add_argument(
+        '--windows-safe', action='store_true',
+        help='Make filename safe for Windows file system '
+             '(truncate filename to 255 characters)')
     encoding_group.add_argument(
         '--vorbis', action='store_true',
         help='Rip songs to Ogg Vorbis encoding instead of MP3')
     parser.add_argument(
         '-r', '--remove-from-playlist', action='store_true',
-        help='Delete tracks from playlist after successful '
+        help='[WARNING: SPOTIFY IS NOT PROPROGATING PLAYLIST CHANGES TO '
+             'THEIR SERVERS] Delete tracks from playlist after successful '
              'ripping [Default=no]')
     parser.add_argument(
         'uri', nargs="+",
@@ -352,10 +393,11 @@ def main(prog_args=sys.argv[1:]):
 
     args.has_log = args.log is not None
     if args.has_log:
-        if args.log[0] == "-":
+        if args.log == "-":
             init(strip=True)
         else:
-            log_file = open(args.log[0], 'a')
+            encoding = "ascii" if args.ascii else "utf-8"
+            log_file = codecs.open(enc_str(args.log), 'a', encoding)
             sys.stdout = wrap_stream(log_file, None, True, False, True)
     else:
         init(strip=True if args.strip_colors else None)
@@ -369,11 +411,19 @@ def main(prog_args=sys.argv[1:]):
         sys.stdout = codecs.getwriter('utf-8')(sys.stdout)
 
     # small sanity check on user option
-    if args.user is not None and args.user[0] == "USER":
+    if args.user is not None and args.user == "USER":
         print(Fore.RED + "Please pass your username as --user " +
               "<YOUR_USER_NAME> instead of --user USER " +
               "<YOUR_USER_NAME>..." + Fore.RESET)
         sys.exit(1)
+
+    # give warning for broken feature
+    if args.remove_from_playlist:
+        print(Fore.RED + "--REMOVE-FROM-PLAYLIST WARNING:")
+        print("SPOTIFY IS NOT PROPROGATING PLAYLIST CHANGES "
+              "TO THEIR SERVERS.")
+        print("YOU WILL NOT SEE ANY CHANGES TO YOUR PLAYLIST ON THE " +
+              "OFFICIAL SPOTIFY DESKTOP OR WEB APP." + Fore.RESET)
 
     if args.wav:
         args.output_type = "wav"
@@ -407,6 +457,7 @@ def main(prog_args=sys.argv[1:]):
     # check that encoder tool is available
     encoders = {
         "flac": ("flac", "flac"),
+        "aiff": ("sox", "sox"),
         "aac": ("faac", "faac"),
         "ogg": ("oggenc", "vorbis-tools"),
         "opus": ("opusenc", "opus-tools"),
@@ -428,11 +479,11 @@ def main(prog_args=sys.argv[1:]):
 
     # format string
     if args.flat:
-        args.format = ["{artist} - {track_name}.{ext}"]
+        args.format = "{artist} - {track_name}.{ext}"
     elif args.flat_with_index:
-        args.format = ["{idx:3} - {artist} - {track_name}.{ext}"]
+        args.format = "{idx:3} - {artist} - {track_name}.{ext}"
     elif args.format is None:
-        args.format = ["{album_artist}/{album}/{artist} - {track_name}.{ext}"]
+        args.format = "{album_artist}/{album}/{artist} - {track_name}.{ext}"
 
     # print some settings
     print(Fore.GREEN + "Spotify Ripper - v" + prog_version + Fore.RESET)
@@ -445,6 +496,8 @@ def main(prog_args=sys.argv[1:]):
         else:
             if args.output_type == "flac":
                 return "FLAC, Compression Level: " + args.comp
+            elif args.output_type == "aiff":
+                return "AIFF"
             elif args.output_type == "alac.m4a":
                 return "Apple Lossless (ALAC)"
             elif args.output_type == "ogg":
@@ -499,12 +552,13 @@ def main(prog_args=sys.argv[1:]):
     print(Fore.YELLOW + "  Settings directory:\t" + Fore.RESET +
           settings_dir())
 
-    print(Fore.YELLOW + "  Format String:\t" + Fore.RESET + args.format[0])
+    print(Fore.YELLOW + "  Format String:\t" + Fore.RESET + args.format)
     print(Fore.YELLOW + "  Overwrite files:\t" +
           Fore.RESET + ("Yes" if args.overwrite else "No"))
 
     # patch a bug when Python 3/MP4
-    if sys.version_info >= (3, 0) and args.output_type == "m4a":
+    if sys.version_info >= (3, 0) and \
+            (args.output_type == "m4a" or args.output_type == "alac.m4a"):
         patch_bug_in_mutagen()
 
     ripper = Ripper(args)
@@ -533,7 +587,9 @@ def main(prog_args=sys.argv[1:]):
     # check if we were passed a file name or search
     def check_uri_args():
         if len(args.uri) == 1 and path_exists(args.uri[0]):
-            args.uri = [line.strip() for line in open(args.uri[0])
+            encoding = "ascii" if args.ascii else "utf-8"
+            args.uri = [line.strip() for line in
+                codecs.open(enc_str(args.uri[0]), 'r', encoding)
                 if not line.strip().startswith("#") and len(line.strip()) > 0]
         elif len(args.uri) == 1 and not args.uri[0].startswith("spotify:"):
             args.uri = [list(ripper.search_query(args.uri[0]))]
@@ -556,15 +612,17 @@ def main(prog_args=sys.argv[1:]):
         abort(set_logged_in=True)
 
     # wait for ripping thread to finish
-    stdin_settings = termios.tcgetattr(sys.stdin)
+    if not args.has_log:
+        stdin_settings = termios.tcgetattr(sys.stdin)
     try:
-        tty.setcbreak(sys.stdin.fileno())
+        if not args.has_log:
+            tty.setcbreak(sys.stdin.fileno())
 
         while ripper.isAlive():
             schedule.run_pending()
 
             # check if the escape button was pressed
-            if hasStdinData():
+            if not args.has_log and hasStdinData():
                 c = sys.stdin.read(1)
                 if c == '\x1b':
                     skip()
@@ -575,7 +633,8 @@ def main(prog_args=sys.argv[1:]):
         print("\n" + Fore.RED + "Aborting..." + Fore.RESET)
         abort()
     finally:
-        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, stdin_settings)
+        if not args.has_log:
+            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, stdin_settings)
 
 if __name__ == '__main__':
     main()

@@ -65,7 +65,7 @@ class Progress(object):
                 track = pair[0]
                 audio_file = pair[1]
 
-                track.load()
+                track.load(self.args.timeout)
                 # check if we should skip track
                 if track.availability != 1 or track.is_local:
                     self.skipped_tracks += 1
@@ -138,12 +138,14 @@ class Progress(object):
         except (NameError, IOError):
             self.term_width = int(os.environ.get('COLUMNS', 120)) - 1
 
+    def increment_track_idx(self):
+        self.track_idx += 1
+
     def prepare_track(self, track):
         self.song_position = 0
         self.song_duration = track.duration
         self.move_cursor = False
         self.current_track = track
-        self.track_idx += 1
 
     def end_track(self, show_end=True):
         if show_end:
