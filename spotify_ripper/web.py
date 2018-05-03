@@ -17,13 +17,19 @@ class WebAPI(object):
     def __init__(self, args, ripper):
         self.args = args
         self.ripper = ripper
-        self.cache = {}
+        self.cache = {
+            "albums_with_filter": {},
+            "artists_on_album": {},
+            "genres": {},
+            "charts": {},
+            "large_coverart": {}
+        }
 
-    def cache_result(self, uri, result):
-        self.cache[uri] = result
+    def cache_result(self, name, uri, result):
+        self.cache[name][uri] = result
 
-    def get_cached_result(self, uri):
-        return self.cache.get(uri)
+    def get_cached_result(self, name, uri):
+        return self.cache[name].get(uri)
 
     def request_json(self, url, msg):
         res = self.request_url(url, msg)
@@ -51,10 +57,10 @@ class WebAPI(object):
     def get_albums_with_filter(self, uri):
         args = self.args
 
-        album_type = ('&album_type=' + args.artist_album_type[0]) \
+        album_type = ('&album_type=' + args.artist_album_type) \
             if args.artist_album_type is not None else ""
 
-        market = ('&market=' + args.artist_album_market[0]) \
+        market = ('&market=' + args.artist_album_market) \
             if args.artist_album_market is not None else ""
 
         def get_albums_json(offset):
@@ -65,7 +71,7 @@ class WebAPI(object):
             return self.request_json(url, "albums")
 
         # check for cached result
-        cached_result = self.get_cached_result(uri)
+        cached_result = self.get_cached_result("albums_with_filter", uri)
         if cached_result is not None:
             return cached_result
 
@@ -95,7 +101,7 @@ class WebAPI(object):
             except KeyError as e:
                 break
         print(str(len(album_uris)) + " albums found")
-        self.cache_result(uri, album_uris)
+        self.cache_result("albums_with_filter", uri, album_uris)
         return album_uris
 
     def get_artists_on_album(self, uri):
@@ -104,7 +110,7 @@ class WebAPI(object):
             return self.request_json(url, "album")
 
         # check for cached result
-        cached_result = self.get_cached_result(uri)
+        cached_result = self.get_cached_result("artists_on_album", uri)
         if cached_result is not None:
             return cached_result
 
@@ -118,7 +124,7 @@ class WebAPI(object):
             return None
 
         result = [artist['name'] for artist in album['artists']]
-        self.cache_result(uri, result)
+        self.cache_result("artists_on_album", uri, result)
         return result
 
     # genre_type can be "artist" or "album"
@@ -132,7 +138,7 @@ class WebAPI(object):
         uri = item.link.uri
 
         # check for cached result
-        cached_result = self.get_cached_result(uri)
+        cached_result = self.get_cached_result("genres", uri)
         if cached_result is not None:
             return cached_result
 
@@ -145,7 +151,7 @@ class WebAPI(object):
             return None
 
         result = json_obj["genres"]
-        self.cache_result(uri, result)
+        self.cache_result("genres", uri, result)
         return result
 
     # doesn't seem to be officially supported by Spotify
@@ -156,7 +162,7 @@ class WebAPI(object):
 
             res = self.request_url(url, region + " " + metrics + " charts")
             if res is not None:
-                csv_items = [enc_str(r) for r in res.text.split("\n")]
+                csv_items = [enc_str(to_ascii(r)) for r in res.text.split("\n")]
                 reader = csv.DictReader(csv_items)
                 return ["spotify:track:" + row["URL"].split("/")[-1]
                             for row in reader]
@@ -164,7 +170,7 @@ class WebAPI(object):
                 return []
 
         # check for cached result
-        cached_result = self.get_cached_result(uri)
+        cached_result = self.get_cached_result("charts", uri)
         if cached_result is not None:
             return cached_result
 
@@ -224,5 +230,42 @@ class WebAPI(object):
             "tracks": tracks_obj
         }
 
-        self.cache_result(uri, charts_obj)
+        self.cache_result("charts", uri, charts_obj)
         return charts_obj
+
+
+    def get_large_coverart(self, uri):
+        def get_track_json(track_id):
+            url = self.api_url('tracks/' + track_id)
+            return self.request_json(url, "track")
+
+        def get_image_data(url):
+            response = self.request_url(url, "cover art")
+            return response.content
+
+        # check for cached result
+        cached_result = self.get_cached_result("large_coverart", uri)
+        if cached_result is not None:
+            return get_image_data(cached_result)
+
+        # extract album id from uri
+        uri_tokens = uri.split(':')
+        if len(uri_tokens) != 3:
+            return None
+
+        track = get_track_json(uri_tokens[2])
+        if track is None:
+            return None
+
+        try:
+            images = track['album']['images']
+        except KeyError:
+            return None
+
+        for image in images:
+            if image["width"] == 640:
+                self.cache_result("large_coverart", uri, image["url"])
+                return get_image_data(image["url"])
+
+        return None
+

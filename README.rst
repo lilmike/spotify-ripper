@@ -56,6 +56,8 @@ Features
 
 -  option to rip to FLAC, a loseless codec, instead of MP3 (requires extra ``flac`` dependency)
 
+-  option to rip to AIFF, a loseless codec, instead of MP3 (requires extra ``sox`` dependency)
+
 -  option to rip to Ogg Vorbis instead of MP3 (requires extra ``vorbis-tools`` dependency)
 
 -  option to rip to Opus instead of MP3 (requires extra ``opus-tools`` dependency)
@@ -81,8 +83,8 @@ Command Line
 
 .. code::
 
-    usage: spotify-ripper [-h] [-S SETTINGS] [-a] [--aac] [--alac]
-                          [--artist-album-type ARTIST_ALBUM_TYPE]
+    usage: spotify-ripper [-h] [-S SETTINGS] [-a] [--aac] [--aiff] [--alac]
+                          [--all-artists] [--artist-album-type ARTIST_ALBUM_TYPE]
                           [--artist-album-market ARTIST_ALBUM_MARKET] [-A]
                           [-b BITRATE] [-c] [--comp COMP] [--comment COMMENT]
                           [--cover-file COVER_FILE]
@@ -91,15 +93,17 @@ Command Line
                           [--format-case {upper,lower,capitalize}] [--flat]
                           [--flat-with-index] [-g {artist,album}]
                           [--grouping GROUPING] [--id3-v23] [-k KEY] [-u USER]
-                          [-p PASSWORD] [-l] [-L LOG] [--pcm] [--mp4]
-                          [--normalize] [-na] [-o] [--opus]
+                          [-p PASSWORD] [--large-cover-art] [-l] [-L LOG] [--pcm]
+                          [--mp4] [--normalize] [-na] [-o] [--opus]
                           [--partial-check {none,weak,strict}]
                           [--play-token-resume RESUME_AFTER] [--playlist-m3u]
-                          [--playlist-wpl] [--playlist-sync] [-q VBR]
-                          [-Q {160,320,96}] [--remove-offline-cache]
-                          [--resume-after RESUME_AFTER] [-R REPLACE [REPLACE ...]]
-                          [-s] [--stereo-mode {j,s,f,d,m,l,r}]
-                          [--stop-after STOP_AFTER] [-V] [--wav] [--vorbis] [-r]
+                          [--playlist-wpl] [--playlist-sync] [--plus-pcm]
+                          [--plus-wav] [-q VBR] [-Q {160,320,96}]
+                          [--remove-offline-cache] [--resume-after RESUME_AFTER]
+                          [-R REPLACE [REPLACE ...]] [-s]
+                          [--stereo-mode {j,s,f,d,m,l,r}]
+                          [--stop-after STOP_AFTER] [--timeout TIMEOUT] [-V]
+                          [--wav] [--windows-safe] [--vorbis] [-r]
                           uri [uri ...]
 
     Rips Spotify URIs to MP3s with ID3 tags and album covers
@@ -113,7 +117,9 @@ Command Line
                             Path to settings, config and temp files directory [Default=~/.spotify-ripper]
       -a, --ascii           Convert the file name and the metadata tags to ASCII encoding [Default=utf-8]
       --aac                 Rip songs to AAC format with FreeAAC instead of MP3
+      --aiff                Rip songs to lossless AIFF encoding instead of MP3
       --alac                Rip songs to Apple Lossless format instead of MP3
+      --all-artists         Store all artists, rather than just the main artist, in the track's metadata tag
       --artist-album-type ARTIST_ALBUM_TYPE
                             Only load albums of specified types when passing a Spotify artist URI [Default=album,single,ep,compilation,appears_on]
       --artist-album-market ARTIST_ALBUM_MARKET
@@ -147,6 +153,7 @@ Command Line
       -u USER, --user USER  Spotify username
       -p PASSWORD, --password PASSWORD
                             Spotify password [Default=ask interactively]
+      --large-cover-art     Attempt to retrieve 640x640 cover art from Spotify's Web API [Default=300x300]
       -l, --last            Use last login credentials
       -L LOG, --log LOG     Log in a log-friendly format to a file (use - to log to stdout)
       --pcm                 Saves a .pcm file with the raw PCM data instead of MP3
@@ -156,13 +163,15 @@ Command Line
                             Convert the file name to normalized ASCII with unicodedata.normalize (NFKD)
       -o, --overwrite       Overwrite existing MP3 files [Default=skip]
       --opus                Rip songs to Opus encoding instead of MP3
-      --partial-check {none,weak,strict}
-                            Check for and overwrite partially ripped files. "weak" will err on the side of not re-ripping the file if it is unsure, whereas "strict" will re-rip the file [Default=weak]
+      --partial-check {none,weak,weak:<sec>,strict}
+                            Check for and overwrite partially ripped files. "weak" will err on the side of not re-ripping the file if it is unsure, whereas "strict" will re-rip the file.  You can override the number of seconds of wiggle-room for the "weak" check using "weak:<sec>" [Default=weak:3]
       --play-token-resume RESUME_AFTER
                             If the 'play token' is lost to a different device using the same Spotify account, the script will wait a speficied amount of time before restarting. This argument takes the same values as --resume-after [Default=abort]
       --playlist-m3u        create a m3u file when ripping a playlist
       --playlist-wpl        create a wpl file when ripping a playlist
       --playlist-sync       Sync playlist songs (rename and remove old songs)
+      --plus-pcm            Saves a .pcm file in addition to the encoded file (e.g. mp3)
+      --plus-wav            Saves a .wav file in addition to the encoded file (e.g. mp3)
       -q VBR, --vbr VBR     VBR quality setting or target bitrate for Opus [Default=0]
       -Q {160,320,96}, --quality {160,320,96}
                             Spotify stream bitrate preference [Default=320]
@@ -177,11 +186,13 @@ Command Line
                             Advanced stereo settings for Lame MP3 encoder only
       --stop-after STOP_AFTER
                             Stops script after a certain amount of time has passed (e.g. 1h30m). Alternatively, accepts a specific time in 24hr format to stop after (e.g 03:30, 16:15)
+      --timeout TIMEOUT     Override the PySpotify timeout value in seconds (Default=10 seconds)
       -V, --version         show program's version number and exit
       --wav                 Rip songs to uncompressed WAV file instead of MP3
+      --windows-safe        Make filename safe for Windows file system (truncate filename to 255 characters)
       --vorbis              Rip songs to Ogg Vorbis encoding instead of MP3
       -r, --remove-from-playlist
-                            Delete tracks from playlist after successful ripping [Default=no]
+                            [WARNING: SPOTIFY IS NOT PROPROGATING PLAYLIST CHANGES TO THEIR SERVERS] Delete tracks from playlist after successful ripping [Default=no]
 
     Example usage:
         rip a single file: spotify-ripper -u user spotify:track:52xaypL0Kjzk0ngwv3oBPR
@@ -290,6 +301,8 @@ Format String Variables
 |                                         | removed at the start of the string if it      |
 |                                         | exists                                        |
 +-----------------------------------------+-----------------------------------------------+
+|``{track_uri}``, ``{uri}``               | Spotify track uri                             |
++-----------------------------------------+-----------------------------------------------+
 
 Any substring in the format string that does not match a variable above will be passed through to the file/path name unchanged.
 
@@ -341,6 +354,8 @@ Prerequisites
 -  (optional) `faac <http://www.audiocoding.com/downloads.html>`__
 
 -  (optional) `fdkaac <https://github.com/nu774/fdkaac>`__
+
+-  (optional) `sox <http://sox.sourceforge.net>`__
 
 Mac OS X
 ~~~~~~~~
@@ -451,6 +466,9 @@ In addition to MP3 encoding, ``spotify-ripper`` supports encoding to FLAC, AAC, 
     # Opus
     $ brew install opus-tools
 
+    # SoX
+    $ brew install sox
+
 **Ubuntu/Debian**
 
 .. code:: bash
@@ -478,6 +496,9 @@ In addition to MP3 encoding, ``spotify-ripper`` supports encoding to FLAC, AAC, 
 
     # Opus
     $ sudo apt-get install opus-tools
+
+    # SoX
+    $ sudo apt-get install sox
 
 
 Upgrade
@@ -510,3 +531,5 @@ License
 
 .. |Version| image:: http://img.shields.io/pypi/v/spotify-ripper.svg?style=flat-square
   :target: https://pypi.python.org/pypi/spotify-ripper
+
+
