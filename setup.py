@@ -20,7 +20,7 @@ def _read(fn):
 
 setup(
     name='spotify-ripper',
-    version='2.9.1',
+    version='2.10.7',
     packages=find_packages(exclude=["tests"]),
     scripts=['spotify_ripper/main.py'],
     include_package_data=True,
@@ -48,14 +48,14 @@ setup(
     ],
 
     # Metadata
-    author='James Newell',
-    author_email='james.newell@gmail.com',
+    author='Michael Taboada',
+    author_email='sripper@forwardme.email',
     description='a small ripper for Spotify that rips Spotify URIs '
                 'to audio files',
     license='MIT',
     keywords="spotify ripper mp3 ogg vorbis flac opus acc mp4 m4a",
-    url='https://github.com/jrnewell/spotify-ripper',
-    download_url='https://github.com/jrnewell/spotify-ripper/tarball/2.9.1',
+    url='https://github.com/lilmike/spotify-ripper',
+    download_url='https://github.com/lilmike/spotify-ripper/tarball/2.9.1',
     classifiers=[
         'Topic :: Multimedia :: Sound/Audio',
         'Topic :: Multimedia :: Sound/Audio :: Capture/Recording',
@@ -65,7 +65,7 @@ setup(
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.7',
     ],
     long_description=_read('README.rst'),
 )
