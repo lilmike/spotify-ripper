@@ -229,7 +229,7 @@ def main(prog_args=sys.argv[1:]):
         help='Convert all words of the file name to upper-case, lower-case, '
              'or capitalized')
     parser.add_argument(
-        '--flat', action='store_true',
+        '--flat', action='store_true', default=False,
         help='Save all songs to a single directory '
              '(overrides --format option)')
     parser.add_argument(
@@ -259,7 +259,7 @@ def main(prog_args=sys.argv[1:]):
         '-p', '--password',
         help='Spotify password [Default=ask interactively]')
     parser.add_argument(
-        '--large-cover-art', action='store_true',
+        '--large-cover-art', action='store_true', default=True,
         help='Attempt to retrieve 640x640 cover art from Spotify\'s Web API '
              '[Default=300x300]')
     group.add_argument(
