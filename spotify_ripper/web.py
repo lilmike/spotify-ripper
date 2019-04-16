@@ -2,6 +2,7 @@
 
 from __future__ import unicode_literals
 
+import urllib3
 from colorama import Fore
 from spotify_ripper.utils import *
 import os
@@ -39,7 +40,9 @@ class WebAPI(object):
         print(Fore.GREEN + "Attempting to retrieve " + msg +
               " from Spotify's Web API" + Fore.RESET)
         print(Fore.CYAN + url + Fore.RESET)
-        res = requests.get(url)
+        urllib3.disable_warnings()
+        headers = {"Authorization": "Bearer %s" % self.args.token} if hasattr(self.args, 'token') else {}
+        res = requests.get(url, headers=headers)
         if res.status_code == 200:
             return res
         else:
