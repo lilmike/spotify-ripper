@@ -37,6 +37,8 @@ class WebAPI(object):
         return res.json() if res is not None else res
 
     def get_token(self):
+        print(Fore.GREEN + "Attempting to retrieve new token" +
+              " from Spotify Web" + Fore.RESET)
         headers = {
             "Connection": "keep - alive",
             "Pragma": "no-cache",
@@ -51,6 +53,11 @@ class WebAPI(object):
         return cookies.get('wp_access_token') if cookies.has_key('wp_access_token') else None
 
     def request_url(self, url, msg):
+        if hasattr(self.args, 'token') is False:
+            token = self.get_token()
+            if token is not None:
+                setattr(self.args, 'token', token)
+                return self.request_url(url, msg)
         print(Fore.GREEN + "Attempting to retrieve " + msg +
               " from Spotify's Web API" + Fore.RESET)
         print(Fore.CYAN + url + Fore.RESET)
@@ -63,9 +70,6 @@ class WebAPI(object):
             if res.status_code == 401:
                 if hasattr(self.args, 'token'):
                     delattr(self.args, 'token')
-                token = self.get_token()
-                if token is not None:
-                    setattr(self.args, 'token', token)
                     return self.request_url(url, msg)
             print(Fore.YELLOW + "URL returned non-200 HTTP code: " +
                   str(res.status_code) + Fore.RESET)
