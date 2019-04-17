@@ -291,7 +291,7 @@ class WebAPI(object):
             return None
 
         for image in images:
-            if image["width"] == 640:
+            if image["width"] >= 600:
                 self.cache_result("large_coverart", uri, image["url"])
                 return get_image_data(image["url"])
 
