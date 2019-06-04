@@ -2,6 +2,7 @@
 
 from __future__ import unicode_literals
 
+import urllib3
 from colorama import Fore
 from spotify_ripper.utils import *
 import os
@@ -35,14 +36,41 @@ class WebAPI(object):
         res = self.request_url(url, msg)
         return res.json() if res is not None else res
 
+    def get_token(self):
+        print(Fore.GREEN + "Attempting to retrieve new token" +
+              " from Spotify Web" + Fore.RESET)
+        headers = {
+            "Connection": "keep - alive",
+            "Pragma": "no-cache",
+            "Cache-Control": "no-cache",
+            "Upgrade-Insecure-Requests": "1",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3"
+        }
+        url = "https://open.spotify.com/browse/featured"
+        res = requests.get(url, headers=headers)
+        cookies = res.cookies.get_dict()
+        return cookies.get('wp_access_token') if cookies.has_key('wp_access_token') else None
+
     def request_url(self, url, msg):
+        if hasattr(self.args, 'token') is False:
+            token = self.get_token()
+            if token is not None:
+                setattr(self.args, 'token', token)
+                return self.request_url(url, msg)
         print(Fore.GREEN + "Attempting to retrieve " + msg +
               " from Spotify's Web API" + Fore.RESET)
         print(Fore.CYAN + url + Fore.RESET)
-        res = requests.get(url)
+        urllib3.disable_warnings()
+        headers = {"Authorization": "Bearer %s" % self.args.token} if hasattr(self.args, 'token') else {}
+        res = requests.get(url, headers=headers)
         if res.status_code == 200:
             return res
         else:
+            if res.status_code == 401:
+                if hasattr(self.args, 'token'):
+                    delattr(self.args, 'token')
+                    return self.request_url(url, msg)
             print(Fore.YELLOW + "URL returned non-200 HTTP code: " +
                   str(res.status_code) + Fore.RESET)
         return None
@@ -263,7 +291,7 @@ class WebAPI(object):
             return None
 
         for image in images:
-            if image["width"] == 640:
+            if image["width"] >= 600:
                 self.cache_result("large_coverart", uri, image["url"])
                 return get_image_data(image["url"])
 
