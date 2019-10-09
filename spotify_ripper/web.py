@@ -49,8 +49,18 @@ class WebAPI(object):
         }
         url = "https://open.spotify.com/browse/featured"
         res = requests.get(url, headers=headers)
-        cookies = res.cookies.get_dict()
-        return cookies.get('wp_access_token') if cookies.has_key('wp_access_token') else None
+        token = None
+        start = res.text.find('"accessToken":"')
+        if start > -1:
+            start += len('"accessToken":"')
+            end = res.text.find('","', start)
+            token = res.text[start:end]
+            print(Fore.GREEN + "Got new token %s" % token +
+                  " from Spotify Web" + Fore.RESET)
+        else:
+            print(Fore.RED + "Unable to retrieve new token" +
+                  " from Spotify Web" + Fore.RESET)
+        return token
 
     def request_url(self, url, msg):
         if hasattr(self.args, 'token') is False:
