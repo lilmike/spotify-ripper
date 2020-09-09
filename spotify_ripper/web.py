@@ -48,7 +48,7 @@ class WebAPI(object):
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3"
         }
         url = "https://open.spotify.com/browse/featured"
-        res = requests.get(url, headers=headers)
+        res = requests.get(url, headers=headers, verify=False)
         token = None
         start = res.text.find('"accessToken":"')
         if start > -1:
@@ -73,7 +73,7 @@ class WebAPI(object):
         print(Fore.CYAN + url + Fore.RESET)
         urllib3.disable_warnings()
         headers = {"Authorization": "Bearer %s" % self.args.token} if hasattr(self.args, 'token') else {}
-        res = requests.get(url, headers=headers)
+        res = requests.get(url, headers=headers, verify=False)
         if res.status_code == 200:
             return res
         else:
